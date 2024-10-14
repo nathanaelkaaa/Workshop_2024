@@ -1,0 +1,15 @@
+{
+    "311061436518367232": {
+        "warns": 2,
+        "history": [
+            {
+                "timestamp": "2024-10-14T14:47:57.920122",
+                "reason": "Raison de l'avertissement"
+            },
+            {
+                "timestamp": "2024-10-14T14:48:08.557042",
+                "reason": "Raison de l'avertissement"
+            }
+        ]
+    }
+}

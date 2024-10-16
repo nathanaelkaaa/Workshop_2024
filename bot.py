@@ -9,8 +9,9 @@ intents.message_content = True  # Nécessaire pour recevoir le contenu des messa
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-with open('blacklist.json', 'r') as fichier:
-    blacklist = json.load(fichier)
+
+with open('banword.json', 'r') as fichier:
+    banwordList = json.load(fichier)
 
 
 # Événement lorsque le bot est prêt
@@ -31,8 +32,8 @@ def load_data():
         return {}
 
 # Enregistrer les données dans le fichier JSON
-def save_data(data):
-    with open('warning.json', 'w') as f:
+def save_data(filename, data):
+    with open(f'{filename}.json', 'w') as f:
         json.dump(data, f, indent=4)
 
 warnings = load_data()
@@ -48,10 +49,29 @@ async def warn(ctx, user: discord.User):
     # Incrémenter le nombre de warns et ajouter un historique
     warnings[uid]['warns'] += 1
     warnings[uid]['history'].append({'timestamp': datetime.now().isoformat(), 'reason': 'Raison de l\'avertissement'})
-
+    
     # Enregistrer les modifications
-    save_data(warnings)
+    save_data('warning',warnings)
     await ctx.send('l\'utilisateur à été averti')
+
+    if warnings[uid]['warns'] >= 3:
+        await ctx.guild.kick(user, reason="3 avertissements atteints.")
+        await ctx.send(f"{user.mention} a été expulsé du serveur.")
+        del warnings[uid]  # Supprimer l'utilisateur du fichier JSON
+        save_data('warning',warnings) # TODO faire en sorte que la suppresion des warn après le kick se fasse
+
+@bot.command()
+async def blacklist(ctx, user: discord.User, raison):   
+    with open('blacklist.json', 'r') as f:
+        blacklist = json.load(f)
+
+    blacklist[user.id] = {'raison': raison}
+
+    with open('blacklist.json', 'w') as f:
+        json.dump(blacklist, f, indent=4)
+    
+    await ctx.guild.kick(user, reason=None)
+
 
 # Événement lorsque quelqu'un envoie un message
 @bot.event
@@ -59,15 +79,21 @@ async def on_message(message):
     if message.author == bot.user:
         return  # Ignore les messages du bot lui-même
 
-    if "hello" in message.content.lower():
-        await message.channel.send(f'Salut {message.author.name}!')
+    for word in banwordList:
+        if word in message.content.lower():
+            await message.delete()
+            await message.channel.send("Message supprimé car il contient un mot interdit.")
+            return
     
     # On fait appel à process_commands pour traiter les commandes (nécessaire si on override on_message)
     await bot.process_commands(message)
 
 @bot.event
 async def on_member_join(member):
-    if blacklist["uid"] == member.id:
+    with open('blacklist.json', 'r') as f:
+        blacklist = json.load(f)
+
+    if blacklist[str(member.id)]:
         await member.kick(reason=None)
 
     # Spécifie le canal de bienvenue, remplace 'welcome-channel' par le nom ou l'ID de ton canal
@@ -75,6 +101,5 @@ async def on_member_join(member):
     if channel:
         await channel.send(f"Bienvenue sur le serveur, {member.mention} ! Nous sommes ravis de te compter parmi nous.")
 
-
 # Lancer le bot avec le token (à remplacer par ton token)
-bot.run('mettre le secret ici')
+bot.run('ton token')

@@ -57,8 +57,9 @@ async def warn(ctx, user: discord.User):
     if warnings[uid]['warns'] >= 3:
         await ctx.guild.kick(user, reason="3 avertissements atteints.")
         await ctx.send(f"{user.mention} a été expulsé du serveur.")
-        del warnings[uid]  # Supprimer l'utilisateur du fichier JSON
-        save_data('warning',warnings) # TODO faire en sorte que la suppresion des warn après le kick se fasse
+        del warnings[uid]  # Supprime l'utilisateur du dictionnaire de warnings
+        save_data('warning', warnings)
+        await ctx.send("Les avertissements de l'utilisateur ont été supprimés.")
 
 @bot.command()
 async def blacklist(ctx, user: discord.User, raison):   
@@ -93,8 +94,11 @@ async def on_member_join(member):
     with open('blacklist.json', 'r') as f:
         blacklist = json.load(f)
 
-    if blacklist[str(member.id)]:
-        await member.kick(reason=None)
+    try:
+        if blacklist[str(member.id)]:
+            await member.kick(reason=None)
+    except KeyError as e:
+        print("Membre non trouvé dans la blacklist")
 
     # Spécifie le canal de bienvenue, remplace 'welcome-channel' par le nom ou l'ID de ton canal
     channel = bot.get_channel(1295315646116008051)
@@ -102,4 +106,4 @@ async def on_member_join(member):
         await channel.send(f"Bienvenue sur le serveur, {member.mention} ! Nous sommes ravis de te compter parmi nous.")
 
 # Lancer le bot avec le token (à remplacer par ton token)
-bot.run('ton token')
+bot.run('oui')

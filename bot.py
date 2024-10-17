@@ -41,7 +41,7 @@ def save_data(filename, data):
 warnings = load_data()
 
 @bot.command()
-async def warn(ctx, user: discord.User):
+async def warn(ctx, user: discord.User, raison):
 
     uid = user.id
     # Vérifier si l'utilisateur existe déjà dans le fichier JSON
@@ -50,18 +50,21 @@ async def warn(ctx, user: discord.User):
 
     # Incrémenter le nombre de warns et ajouter un historique
     warnings[uid]['warns'] += 1
-    warnings[uid]['history'].append({'timestamp': datetime.now().isoformat(), 'reason': 'Raison de l\'avertissement'})
+    warnings[uid]['history'].append({'timestamp': datetime.now().isoformat(), 'reason': raison})
     
     # Enregistrer les modifications
     save_data('warning',warnings)
     await ctx.send('l\'utilisateur à été averti')
+    await bot.get_channel(1296402211449868301).send(f"L'utilisateur {user.name} à été **avertie** pour la raison suivante: {raison}")
 
     if warnings[uid]['warns'] >= 3:
         await ctx.guild.kick(user, reason="3 avertissements atteints.")
-        await ctx.send(f"{user.mention} a été expulsé du serveur.")
+        await bot.get_channel(1296402211449868301).send(f"{user.mention} a été expulsé du serveur.")
+
         del warnings[uid]  # Supprime l'utilisateur du dictionnaire de warnings
         save_data('warning', warnings)
-        await ctx.send("Les avertissements de l'utilisateur ont été supprimés.")
+        await bot.get_channel(1296402211449868301).send(f"Les avertissements de l'utilisateur {user.mention} ont été supprimés.")
+
 
 @bot.command()
 async def blacklist(ctx, user: discord.User, raison):   
@@ -75,6 +78,7 @@ async def blacklist(ctx, user: discord.User, raison):
     
     await user.send("Tu as été black listé")
     await ctx.guild.kick(user, reason=None)
+    await bot.get_channel(1296402211449868301).send(f"L'utilisateur {user.name} à été **blacklisté** pour la raison suivante: {raison}")
 
 def load_scores():
     if os.path.exists('scoreUser.json'):
@@ -103,6 +107,10 @@ def initialize_user(user_id, scores):
         scores[str(user_id)] = 60  # Score initial de 60
         save_scores(scores)
 
+def initScoreMemberJoin(memberId, scores):
+    scores[str(memberId)] = 60  # Score initial de 60
+    save_scores(scores)
+
 # Déterminer le nombre d'étoiles basé sur le score
 def get_star_rating(score):
     if score >= 81:
@@ -130,6 +138,7 @@ async def on_message(message):
         if word in content:
             await message.delete()
             await message.channel.send("Message supprimé car il contient un mot interdit.")
+            await bot.get_channel(1296402211449868301).send(f"Le message de l'utilisateur {message.author.name} à été supprimé car il contient un mot banni suivant: {word}")
             return
         
     if any(word in content for word in ["merci", "aide", "positif"]):
@@ -143,6 +152,12 @@ async def on_message(message):
         # Message inapproprié
         new_score = update_score(message.author.id, -10, scores)
         await message.channel.send(f"Attention, comportement inapproprié. Nouveau score : {new_score}.")
+        
+        if get_score(message.author.id, scores) >= 10 and get_score(message.author.id, scores) <= 20:
+            await warn(await bot.get_context(message), message.author, "Score inférieur à 20")
+
+        if get_score(message.author.id, scores) >= 0 and get_score(message.author.id, scores) <= 9:
+            await warn(await bot.get_context(message), message.author, "Score inférieur à 10")
 
     # Sanction ou récompense en fonction du score
     score = get_score(message.author.id, scores)
@@ -176,6 +191,12 @@ async def reset_score(ctx, member: discord.Member):
     save_scores(scores)
     await ctx.send(f"Le score de {member.display_name} a été réinitialisé à 60 points.")
 
+@bot.command()
+async def showBlackList(ctx):
+    with open('blacklist.json', 'r') as f:
+        blacklist = json.load(f)
+    await ctx.send(blacklist)
+
 
 @bot.event
 async def on_member_join(member):
@@ -184,12 +205,15 @@ async def on_member_join(member):
 
     try:
         if blacklist[str(member.id)]:
+            await bot.get_channel(1296402211449868301).send(f"L'utilsateur {member.mention} à tenté de rejoindre le serveur mais celui-ci est dans la black list")
             await member.kick(reason=None)
     except KeyError as e:
         print("Membre non trouvé dans la blacklist")
 
     # Spécifie le canal de bienvenue, remplace 'welcome-channel' par le nom ou l'ID de ton canal
     channel = bot.get_channel(1295315646116008051)
+    scores = load_scores()
+    initScoreMemberJoin(str(member.id), scores)
     if channel:
         await channel.send(f"Bienvenue sur le serveur, {member.mention} ! Nous sommes ravis de te compter parmi nous.")
 
